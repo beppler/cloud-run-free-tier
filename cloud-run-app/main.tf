@@ -60,7 +60,7 @@ resource "google_cloud_run_v2_service" "free_app" {
     }
 
     containers {
-      image = "us-docker.pkg.dev/cloudrun/container/hello:latest"
+      image = var.container_image
 
       ports {
         container_port = 8080

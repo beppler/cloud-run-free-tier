@@ -13,15 +13,15 @@ The project is split into three logical steps to handle resource lifecycles and 
 ```text
 project-free-tier/
 ├── README.md               # This instructions file
+├── common.tfvars           # Values shared by all three steps
 ├── backend-setup/          # Step 1: Isolated State Bucket Creation
-│   ├── main.tf
-│   └── terraform.tfvars
+│   └── main.tf
 ├── cloud-run-app/          # Step 2: Cloud Run App Deployment (Saves state to GCS)
 │   ├── main.tf
-│   └── terraform.tfvars
+│   └── terraform.tfvars    # Optional: container_image
 └── domain-mappings/        # Step 3: Optional Custom Domain Mappings via CNAME
     ├── main.tf
-    └── terraform.tfvars
+    └── terraform.tfvars    # custom_domains
 ```
 
 ---
@@ -39,38 +39,37 @@ project-free-tier/
 
 ## Variable File Configuration
 
-Before running any deployment commands, you must update the configuration files across all folders with your project details.
+Before running any deployment commands, set your project details. Values shared by all three folders live in a single `common.tfvars` at the project root, and each command below passes it with `-var-file=../common.tfvars`.
 
-### 1. Configure Step 1 (backend-setup)
+### 1. Shared values (common.tfvars)
 
-Open `backend-setup/terraform.tfvars` and edit the values:
+Create `common.tfvars` in the project root:
 
 ```hcl
-project_id  = "your-gcp-project-id-here"
-bucket_name = "a-globally-unique-name-for-your-bucket"
+project_id   = "your-gcp-project-id-here"
+bucket_name  = "a-globally-unique-name-for-your-bucket"
+service_name = "my-free-tier-application"
 ```
 
-> ⚠️ **IMPORTANT:** Use the **same** `bucket_name` in the `terraform.tfvars` of `cloud-run-app/` and `domain-mappings/`. Their `backend "gcs"` blocks read it via `var.bucket_name` during `tofu init` (OpenTofu 1.8+ early evaluation), so there is nothing to hardcode in `main.tf`. If you change the bucket name later, rerun `tofu init -reconfigure` in those folders.
+> ⚠️ **IMPORTANT:**
+>
+> The `backend "gcs"` blocks of `cloud-run-app/` and `domain-mappings/` read `var.bucket_name` during `tofu init` (OpenTofu 1.8+ early evaluation), so `-var-file=../common.tfvars` must be passed to `tofu init` too. If you change the bucket name later, rerun `tofu init -reconfigure -var-file=../common.tfvars` in those folders.
+>
+> `backend-setup/` does not use `service_name`, so OpenTofu prints a harmless "Value for undeclared variable" warning there.
 
-### 2. Configure Step 2 (cloud-run-app)
+### 2. Configure Step 2 (cloud-run-app) — optional
 
-Open `cloud-run-app/terraform.tfvars` and match the values from Step 1, adding your application name and container image:
+To deploy your own image instead of the default hello container, create `cloud-run-app/terraform.tfvars`:
 
 ```hcl
-project_id      = "your-gcp-project-id-here"
-bucket_name     = "a-globally-unique-name-for-your-bucket"
-service_name    = "my-free-tier-application"
 container_image = "us-docker.pkg.dev/cloudrun/container/hello:latest"
 ```
 
 ### 3. Configure Step 3 (domain-mappings)
 
-Open `domain-mappings/terraform.tfvars` to map your custom subdomains to your application:
+Create `domain-mappings/terraform.tfvars` to map your custom subdomains to your application:
 
 ```hcl
-project_id     = "your-gcp-project-id-here"
-bucket_name    = "a-globally-unique-name-for-your-bucket"
-service_name   = "my-free-tier-application"
 custom_domains = ["mydomain.com", "dashboard.system.net"]
 ```
 
@@ -102,8 +101,8 @@ Navigate to the setup directory, initialize the Google provider, and apply the c
 
 ```bash
 cd backend-setup
-tofu init
-tofu apply -auto-approve
+tofu init -var-file=../common.tfvars
+tofu apply -auto-approve -var-file=../common.tfvars
 ```
 
 ### Step 2: Deploy the Free Tier Cloud Run Service
@@ -112,8 +111,8 @@ Navigate to your application infrastructure directory. When you execute `tofu in
 
 ```bash
 cd ../cloud-run-app
-tofu init
-tofu apply -auto-approve
+tofu init -var-file=../common.tfvars
+tofu apply -auto-approve -var-file=../common.tfvars
 ```
 
 Once Step 2 finishes processing, the terminal output will display a public link (`application_url`).
@@ -124,8 +123,8 @@ If you have custom domains configured in your variables file, deploy the mapping
 
 ```bash
 cd ../domain-mappings
-tofu init
-tofu apply -auto-approve
+tofu init -var-file=../common.tfvars
+tofu apply -auto-approve -var-file=../common.tfvars
 ```
 
 ---
@@ -137,13 +136,13 @@ If you want to deactivate the project in the future and remove all assets from G
 ```bash
 # 1. Removes custom domain mappings
 cd domain-mappings
-tofu destroy -auto-approve
+tofu destroy -auto-approve -var-file=../common.tfvars
 
 # 2. Removes the Cloud Run application
 cd ../cloud-run-app
-tofu destroy -auto-approve
+tofu destroy -auto-approve -var-file=../common.tfvars
 
 # 3. Removes the Cloud Storage bucket (make sure it is empty)
 cd ../backend-setup
-tofu destroy -auto-approve
+tofu destroy -auto-approve -var-file=../common.tfvars
 ```
