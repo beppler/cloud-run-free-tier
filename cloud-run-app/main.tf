@@ -1,8 +1,9 @@
 terraform {
-  # IMPORTANT: OpenTofu requires this block to be static.
-  # Manually enter the SAME bucket name below that you use in your backend-setup .tfvars file.
+  # Variables in the backend block require OpenTofu >= 1.8 (early evaluation).
+  required_version = ">= 1.8"
+
   backend "gcs" {
-    bucket = "replace-with-your-unique-bucket-name"
+    bucket = var.bucket_name
     prefix = "cloud-run-app/state"
   }
 
@@ -17,6 +18,11 @@ terraform {
 variable "project_id" {
   type = string
   description = "Your GCP project ID"
+}
+
+variable "bucket_name" {
+  type        = string
+  description = "The state bucket created in backend-setup"
 }
 
 variable "service_name" {

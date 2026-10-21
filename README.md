@@ -28,7 +28,7 @@ project-free-tier/
 
 ## Prerequisites
 
-1. **OpenTofu CLI** installed on your local machine.
+1. **OpenTofu CLI** version **1.8 or later** installed on your local machine.
 2. A **Service Account** created in your GCP Console with the following minimum roles assigned:
    - Cloud Run Admin (`roles/run.admin`)
    - Service Account User (`roles/iam.serviceAccountUser`)
@@ -50,14 +50,7 @@ project_id  = "your-gcp-project-id-here"
 bucket_name = "a-globally-unique-name-for-your-bucket"
 ```
 
-> ⚠️ **IMPORTANT:** OpenTofu's backend blocks do not accept dynamic input variables. Therefore, you **MUST** open the `main.tf` files inside **both** the `cloud-run-app/` and `domain-mappings/` folders, locate the `backend "gcs"` blocks, and manually hardcode your bucket name into the `bucket` property:
->
-> ```hcl
-> backend "gcs" {
->   bucket = "PASTE_THE_EXACT_SAME_BUCKET_NAME_HERE"
->   # ...
-> }
-> ```
+> ⚠️ **IMPORTANT:** Use the **same** `bucket_name` in the `terraform.tfvars` of `cloud-run-app/` and `domain-mappings/`. Their `backend "gcs"` blocks read it via `var.bucket_name` during `tofu init` (OpenTofu 1.8+ early evaluation), so there is nothing to hardcode in `main.tf`. If you change the bucket name later, rerun `tofu init -reconfigure` in those folders.
 
 ### 2. Configure Step 2 (cloud-run-app)
 
@@ -76,6 +69,7 @@ Open `domain-mappings/terraform.tfvars` to map your custom subdomains to your ap
 
 ```hcl
 project_id     = "your-gcp-project-id-here"
+bucket_name    = "a-globally-unique-name-for-your-bucket"
 service_name   = "my-free-tier-application"
 custom_domains = ["mydomain.com", "dashboard.system.net"]
 ```
